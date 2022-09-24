@@ -1,29 +1,62 @@
-import boto3
 import os
+import json
+import uuid
+import base64
+
+import boto3
+
+dynamodb = boto3.resource('dynamodb')
+connections = dynamodb.Table(os.environ['table'])
 
 
 def lambda_handler(event, context):
-    post_data = json.loads(event.get('body', '{}')).get('data')
-    print(post_data)
+    image = json.loads(event.get('body', '{}')).get('base_64_image')
+    folder_name = json.loads(event.get('body', '{}')).get('folder_name')
+
+    if image is None:
+        return {'statusCode': 500, 'body': 'image not specified'}
+
+    if folder_name is None:
+        return {'statusCode': 500, 'body': 'folder_name not specified'}
+
+    # 画像を保存
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(folder_name)
+    try:
+        bucket.create(
+            CreateBucketConfiguration={
+                'LocationConstraint': 'ap-northeast-1'
+                },
+        )
+    except s3.meta.client.exceptions.BucketAlreadyExists:
+        pass
+
+    bucket.put_object(
+        Key=f'{uuid.uuid4()}.png',
+        Body=convert_b64_string_to_bynary(image),
+        ContentType='image/png'
+    )
+
+    # 画像を送信
     domain_name = event.get('requestContext', {}).get('domainName')
     stage = event.get('requestContext', {}).get('stage')
 
-    dynamo_client = boto3.client('dynamodb')
-
-    dynamo_resp = dynamo_client.scan(
-        TableName=os.environ['table'],
-    )
-    items = dynamo_resp.get('Items')
+    items = connections.scan(ProjectionExpression='connectionId').get('Items')
     if items is None:
         return {'statusCode': 500, 'body': 'something went wrong'}
 
     apigw_management = boto3.client('apigatewaymanagementapi',
                                     endpoint_url=F"https://{domain_name}/{stage}")
     for item in items:
-        try:
-            print(item)
-            _ = apigw_management.post_to_connection(ConnectionId=item['id'], Data=post_data)
-        except:
-            pass
+        if item["connectionId"] != event.get('requestContext', {}).get('connectionId'):
+            try:
+                _ = apigw_management.post_to_connection(ConnectionId=item["connectionId"], Data=image)
+            except:
+                pass
 
     return {'statusCode': 200, 'body': 'ok'}
+
+
+def convert_b64_string_to_bynary(s):
+    """base64繧偵ョ繧ｳ繝ｼ繝峨☆繧�"""
+    return base64.b64decode(s.encode("UTF-8"))
