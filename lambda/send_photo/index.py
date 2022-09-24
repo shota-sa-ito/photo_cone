@@ -23,5 +23,7 @@ def lambda_handler(event, context):
         try:
             print(item)
             _ = apigw_management.post_to_connection(ConnectionId=item['id'], Data=post_data)
-    
+        except:
+            pass
+
     return {'statusCode': 200, 'body': 'ok'}
