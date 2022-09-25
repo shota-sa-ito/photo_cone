@@ -22,19 +22,31 @@ def lambda_handler(event, context):
     # 画像を保存
     s3 = boto3.resource('s3')
     bucket = s3.Bucket(folder_name)
+    bucket_policy = {
+        'Version': '2012-10-17',
+        'Statement': [{
+            'Sid': 'AddPerm',
+            'Effect': 'Allow',
+            'Principal': '*',
+            'Action': ['s3:GetObject'],
+            'Resource': f'arn:aws:s3:::{folder_name}/*'
+        }]
+    }
+    bucket_policy = json.dumps(bucket_policy)
     try:
         bucket.create(
             CreateBucketConfiguration={
                 'LocationConstraint': 'ap-northeast-1'
                 },
         )
+        s3.put_bucket_policy(Bucket=folder_name, Policy=bucket_policy)
     except s3.meta.client.exceptions.BucketAlreadyExists:
         pass
 
     bucket.put_object(
-        Key=f'{uuid.uuid4()}.png',
+        Key=f'{uuid.uuid4()}.jpeg',
         Body=convert_b64_string_to_bynary(image),
-        ContentType='image/png'
+        ContentType='image/jpeg'
     )
 
     # 画像を送信
@@ -58,5 +70,4 @@ def lambda_handler(event, context):
 
 
 def convert_b64_string_to_bynary(s):
-    """base64繧偵ョ繧ｳ繝ｼ繝峨☆繧�"""
-    return base64.b64decode(s.encode("UTF-8"))
+    return base64.b64decode(s)
