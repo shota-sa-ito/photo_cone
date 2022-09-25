@@ -231,7 +231,6 @@ Resources:
               if folder_name is None:
                   return {'statusCode': 500, 'body': 'folder_name not specified'}
           
-              # 画像を保存
               s3 = boto3.resource('s3')
               bucket = s3.Bucket(folder_name)
               try:
@@ -244,12 +243,11 @@ Resources:
                   pass
           
               bucket.put_object(
-                  Key=f'{uuid.uuid4()}.png',
+                  Key=f'{uuid.uuid4()}.jpeg',
                   Body=convert_b64_string_to_bynary(image),
-                  ContentType='image/png'
+                  ContentType='image/jpeg'
               )
           
-              # 画像を送信
               domain_name = event.get('requestContext', {}).get('domainName')
               stage = event.get('requestContext', {}).get('stage')
           
@@ -270,8 +268,7 @@ Resources:
           
           
           def convert_b64_string_to_bynary(s):
-              """base64繧偵ョ繧ｳ繝ｼ繝峨☆繧�"""
-              return base64.b64decode(s.encode("UTF-8"))
+              return base64.b64decode(s)
 
       Role: !GetAtt 
         - MessageHandlerServiceRoleDF05266A
@@ -320,15 +317,19 @@ Resources:
                       {
                           "bucket": bucket_name,
                           "key": obj.key,
-                          "img": img,
+                          "img": f'data:image/jpeg;base64,{img}',
                       }
                   )
+          
+              print(resp)
+              print(json.dumps(resp))
           
               return {
                 'statusCode': 200,
                 'headers': {"Access-Control-Allow-Origin": "http://localhost:3000"},
                 'body': json.dumps(resp)
               }
+
       Role: !GetAtt 
         - MessageHandlerServiceRoleDF05266A
         - Arn
@@ -354,11 +355,13 @@ Resources:
               resp = []
               s3 = boto3.resource('s3')
               for bucket in s3.buckets.all():
-                  resp.append(
-                      {
-                          "folder_name": bucket.name
-                      }
-                  )
+                  strings = bucket.name.split('-')
+                  if len(strings) > 0 and strings[0] == 'ishinomakihackathon2022':
+                      resp.append(
+                          {
+                              "folder_name": bucket.name
+                          }
+                      )
           
               return {
                 'statusCode': 200, 

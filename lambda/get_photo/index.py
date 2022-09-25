@@ -29,11 +29,15 @@ def lambda_handler(event, context):
             {
                 "bucket": bucket_name,
                 "key": obj.key,
-                "img": img,
+                "img": f'data:image/jpeg;base64,{img}',
             }
         )
 
     print(resp)
     print(json.dumps(resp))
 
-    return {'statusCode': 200, 'body': json.dumps(resp)}
+    return {
+        'statusCode': 200,
+        'headers': {"Access-Control-Allow-Origin": "http://localhost:3000"},
+        'body': json.dumps(resp)
+    }
